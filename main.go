@@ -28,6 +28,7 @@ func main() {
 	e.POST("/register", service.RegisterTonNode)
 	e.POST("/node", service.GetTonNodeByIP)
 	e.DELETE("/node", service.RemoveTonNode)
+
 	//Start the server
 	e.Start(":30001")
 }
