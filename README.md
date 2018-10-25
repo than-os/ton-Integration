@@ -5,12 +5,12 @@
 
 - [ ] Add Auth Based Access To Few Features
 
-- [ ] Add Payment Method
+- [x] Add Payment Method
 
-- [ ] Code Refactor, Optimization
+- [x] Code Refactor, Optimization
 
 - [ ] Network Logs and Session Management
 
-- [ ] Create User friendly, Declarative Methods
+- [x] Create User friendly, Declarative Methods
 
 - [ ] Documentation
