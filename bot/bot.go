@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/than-os/sent-dante/bot/service"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/than-os/sent-dante/bot/dbo"
+	"github.com/than-os/sent-dante/bot/service"
 
 	"github.com/fatih/color"
 
@@ -16,6 +18,7 @@ import (
 	"gopkg.in/tucnak/telebot.v2"
 )
 
+var ldb dbo.SentinelBot
 var (
 	uri   string
 	text  string
@@ -23,6 +26,9 @@ var (
 )
 
 func init() {
+	ldb.Database = "SentinelBot"
+	ldb.Server = "localhost"
+	ldb.NewLevelDB()
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("could not read ENV VARS. Shutting Down!!! \n%v", err)
 	}
@@ -99,12 +105,12 @@ func main() {
 			ShowAlert: true,
 		})
 	})
-		//
-		//updates := b.Updates
-		//
-		//for u := range updates {
-		//	fmt.Println("updates: ", u.Message)
-		//}
+	//
+	//updates := b.Updates
+	//
+	//for u := range updates {
+	//	fmt.Println("updates: ", u.Message)
+	//}
 
 	b.Handle(service.ListHandle(b, Nodes))
 
