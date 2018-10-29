@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -29,11 +28,11 @@ func handleBandwidth(b *telebot.Bot, m *telebot.Message, nodes []models.TONNode)
 		}
 		switch m.Text {
 		case "100 MB":
-			b.Send(m.Sender, "you have opted for 100MB bandwidth")
+			b.Send(m.Sender, "you have opted for 10 days of unlimited bandwidth")
 		case "500 MB":
-			b.Send(m.Sender, "you have opted for 500MB bandwidth")
+			b.Send(m.Sender, "you have opted for 30 days of unlimited bandwidth")
 		case "1 GB":
-			b.Send(m.Sender, "you have opted for 1GB bandwidth")
+			b.Send(m.Sender, "you have opted for 3 months of unlimited bandwidth")
 		}
 		b.Send(m.Sender, `Please select a node ID from the list below and reply in the format of
 			<1> for Node 1, <2> for Node 2 and so on...`)
@@ -94,21 +93,9 @@ func handleTxHash(b *telebot.Bot, m *telebot.Message, nodes []models.TONNode) {
 		b.Send(m.Sender, "error while getting user wallet. Please attach your wallet by sharing your ETH wallet with the bot")
 		return
 	}
+	log.Println("walletAddr: ", fmt.Sprintf("%s", wallet), m.Text)
 	if findTxByHash(m.Text, fmt.Sprintf("%s", wallet)) {
 		log.Println("line 1")
-		//var n models.TONNode
-		//log.Println("nodes here: ", nodes[strToInt-1])
-		//for idx, node := range nodes {
-		//	log.Println(node)
-		//	if string(idx) == string(strToInt -1) {
-		//		log.Println("hello hello")
-		//		n = node
-		//		log.Println("found node: ", node)
-		//		break
-		//	}
-		//}
-
-		//log.Println("node here: ", n)
 		uri := "https://t.me/socks?server=" + nodes[idx].IPAddr + "&port=" + strconv.Itoa(nodes[idx].Port) + "&user=" + nodes[idx].Username + "&pass=" + nodes[idx].Password
 		//log.Println("line 2")
 
@@ -134,11 +121,8 @@ func handleTxHash(b *telebot.Bot, m *telebot.Message, nodes []models.TONNode) {
 		b.Send(m.Sender, "Congratulations!! please click the button below to connect to the sentinel dVPN node", &telebot.ReplyMarkup{
 			InlineKeyboard: inlineButton(nodes[idx].Username, uri),
 		})
-		return
 	}
-
-	b.Send(m.Sender, "something wrong with tx hash")
-
+	b.Send(m.Sender, "invalid TXN Hash. Please try again")
 }
 
 func handleNodeId(b *telebot.Bot, m *telebot.Message, nodes []models.TONNode) {
@@ -198,11 +182,7 @@ func nodeId(m *telebot.Message) string {
 }
 
 func findTxByHash(txHash, walletAddr string) bool {
-	//w, err := hexutil.Decode(walletAddr)
-	//if err != nil {
-	//      log.Println(err)
-	//      return false
-	//}
+
 	wallet := "0x" + constants.ZFill + strings.TrimLeft(walletAddr, "0x")
 	uri := constants.TEST_SENT_URI + wallet + constants.TEST_SENT_URI2 + wallet
 	log.Println("length of the wallet := ", len(wallet))
@@ -211,27 +191,60 @@ func findTxByHash(txHash, walletAddr string) bool {
 		log.Println(err)
 		return false
 	}
+	defer resp.Body.Close()
 	var body models.TxReceiptList
 	if err = json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		log.Println(err)
 		return false
 	}
-	for _, txReceipt := range body.Results {
-		if txReceipt.TransactionHash == txHash {
-			log.Println("response decoded: ", body.Results[0])
-			//topic[1] from
-			//topic[2] to
-			okWallet := txReceipt.Topics[1] == walletAddr
-			okRecipient := txReceipt.Topics[2] == os.Getenv("nodeWallet")
-			amount := hex2int(txReceipt.Data)
-			if okWallet && okRecipient && amount == uint64(2) {
-				return true
-			}
-			log.Println("\n\n money: ", hex2int(txReceipt.Data))
 
+	var val bool
+	//log.Println("decoded: \n", body)
+	for _, txReceipt := range body.Results {
+
+		//if txReceipt.TransactionHash == txHash {
+		//	log.Println("inside for loop outside: ", txReceipt.TransactionHash, txHash)
+		//	return true
+		//
+		//}
+		log.Println("insane")
+		if txReceipt.TransactionHash == txHash {
+			//	//topic[1] from
+			//	log.Println("whats going on?")
+			//
+			//	//topic[2] to
+			//nodeWallet := os.Getenv("NODE_WALLET")
+			nodeWallet := "0xceb5bc384012f0eebee119d82a24925c47714fe3"
+			log.Println("insane2")
+
+			okWallet :=  strings.EqualFold(txReceipt.Topics[1], "0x" + constants.ZFill + strings.TrimLeft(walletAddr, "0x"))
+			log.Println("insane3")
+
+			okRecipient := strings.EqualFold(txReceipt.Topics[2], "0x" + constants.ZFill + strings.TrimLeft(nodeWallet, "0x"))
+			log.Println("insane4")
+
+			okAmount := hex2int(txReceipt.Data) == uint64(200000000)
+			log.Println("insane5", okWallet, okRecipient, okAmount)
+
+			if okWallet && okRecipient && okAmount {
+				log.Println("whhhjhdsdfvjdvfhjvjkhdvdfhdvfh")
+				val = true
+			}
+			//return false
+			log.Println("\n\n money: ", hex2int(txReceipt.Data))
+			if val == true {
+				return true
+			} else {
+				return false
+			}
+		}
+		if val == true {
+			return true
+		} else {
+			return false
 		}
 	}
-
+	log.Println("came here")
 	return false
 }
 

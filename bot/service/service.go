@@ -137,6 +137,7 @@ func TestHandle(b *telebot.Bot) {
 func checkWalletAddress(m *telebot.Message) string {
 	if common.IsHexAddress(m.Text) {
 		return m.Text
+		//return true
 	}
 	return ""
 }
