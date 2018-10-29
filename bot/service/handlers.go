@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -35,7 +36,7 @@ func handleBandwidth(b *telebot.Bot, m *telebot.Message, nodes []models.TONNode)
 			b.Send(m.Sender, "you have opted for 1GB bandwidth")
 		}
 		b.Send(m.Sender, `Please select a node ID from the list below and reply in the format of
-			<#1> for Node 1, <#2> for Node 2`)
+			<1> for Node 1, <2> for Node 2 and so on...`)
 		for idx, node := range nodes {
 			//uri := "https://t.me/socks?server=" + node.IPAddr + "&port=" + strconv.Itoa(node.Port) + "&user=" + node.Username + "&pass=" + node.Password
 			geo, err := utils.GetGeoLocation(node.IPAddr)
@@ -72,26 +73,72 @@ func handleBandwidth(b *telebot.Bot, m *telebot.Message, nodes []models.TONNode)
 }
 
 func handleTxHash(b *telebot.Bot, m *telebot.Message, nodes []models.TONNode) {
-
-	val, err := strconv.Atoi(NODE_ID[1:])
+	resp, err := db.CheckUserOptions(m.Sender.Username, "node")
 	if err != nil {
-		b.Send(m.Sender, "Could not read NODE ID")
+		log.Println("error in handleTxHash: ", err)
+		b.Send(m.Sender, "could not get user info")
 		return
 	}
-	log.Println("in validhex case", m.Text, val-1)
-	nodeIdx := val - 1
-	if nodeIdx > len(nodes) {
-		b.Send(m.Sender, "invalid node id")
+	respToStr := fmt.Sprintf("%s", resp)
+	strToInt, err := strconv.Atoi(respToStr)
+	if err != nil {
+		log.Println("error in ASCII to INT: ", err)
+		b.Send(m.Sender, "ASCII to INT conversion error")
 		return
 	}
-	if findTxByHash(m.Text, "0x6b6df9e25f7bf2e363ec1a52a7da4c4a64f5769e") {
-		uri := "https://t.me/socks?server=" + nodes[nodeIdx].IPAddr + "&port=" + strconv.Itoa(nodes[nodeIdx].Port) + "&user=" + nodes[nodeIdx].Username + "&pass=" + nodes[nodeIdx].Password
+
+	idx := strToInt - 1
+	//this wallet should be user wallet
+	wallet, err := db.CheckUserOptions(m.Sender.Username, "wallet")
+	if err != nil {
+		b.Send(m.Sender, "error while getting user wallet. Please attach your wallet by sharing your ETH wallet with the bot")
+		return
+	}
+	if findTxByHash(m.Text, fmt.Sprintf("%s", wallet)) {
+		log.Println("line 1")
+		//var n models.TONNode
+		//log.Println("nodes here: ", nodes[strToInt-1])
+		//for idx, node := range nodes {
+		//	log.Println(node)
+		//	if string(idx) == string(strToInt -1) {
+		//		log.Println("hello hello")
+		//		n = node
+		//		log.Println("found node: ", node)
+		//		break
+		//	}
+		//}
+
+		//log.Println("node here: ", n)
+		uri := "https://t.me/socks?server=" + nodes[idx].IPAddr + "&port=" + strconv.Itoa(nodes[idx].Port) + "&user=" + nodes[idx].Username + "&pass=" + nodes[idx].Password
+		//log.Println("line 2")
+
+		_, err := db.AddUserData(m.Sender.Username, "uri", uri)
+		//log.Println("line 3")
+
+		if err != nil {
+		//	log.Println("line 4")
+			log.Println("error in adding user data: ", err)
+			b.Send(m.Sender, "error in adding user details")
+			return
+		}
+		log.Println("line 5")
 
 		b.Send(m.Sender, "Thanks for submitting the TX-HASH. We're validating it")
+		userWallet, err := db.CheckUserOptions(m.Sender.Username, "wallet")
+		if err != nil {
+			b.Send(m.Sender, "error while fetching user wallet address. in case you have not attached your wallet address, please share your wallet address again.")
+			return
+		}
+		log.Printf("your wallet address: %s", userWallet)
+
 		b.Send(m.Sender, "Congratulations!! please click the button below to connect to the sentinel dVPN node", &telebot.ReplyMarkup{
-			InlineKeyboard: inlineButton(nodes[nodeIdx].Username, uri),
+			InlineKeyboard: inlineButton(nodes[idx].Username, uri),
 		})
+		return
 	}
+
+	b.Send(m.Sender, "something wrong with tx hash")
+
 }
 
 func handleNodeId(b *telebot.Bot, m *telebot.Message, nodes []models.TONNode) {
@@ -101,9 +148,15 @@ func handleNodeId(b *telebot.Bot, m *telebot.Message, nodes []models.TONNode) {
 		b.Send(m.Sender, "invalid node id")
 		return
 	}
+	_, err := db.AddUserData(m.Sender.Username, "node", m.Text)
+	if err != nil {
+		b.Send(m.Sender, "could not store user info")
+		return
+	}
+
 	log.Println("in nodeId case", m.Text)
-	b.Send(m.Sender, "please send 5 SENTS to the following address and submit the tx hash here: ")
-	b.Send(m.Sender, "0xCeb5bC384012f0EEbeE119d82A24925C47714fe3")
+	b.Send(m.Sender, "please send 2 SENTS to the following address and submit the tx hash here: ")
+	b.Send(m.Sender, "0xCeb5bC384012f0EEbeE119d82A24925C47714fe3") //should be node wallet address
 }
 
 func validHex(b *telebot.Bot, m *telebot.Message) string {
@@ -158,12 +211,71 @@ func findTxByHash(txHash, walletAddr string) bool {
 		log.Println(err)
 		return false
 	}
-	var body interface{}
+	var body models.TxReceiptList
 	if err = json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		log.Println(err)
 		return false
 	}
-	log.Println("response decoded: ", body)
+	for _, txReceipt := range body.Results {
+		if txReceipt.TransactionHash == txHash {
+			log.Println("response decoded: ", body.Results[0])
+			//topic[1] from
+			//topic[2] to
+			okWallet := txReceipt.Topics[1] == walletAddr
+			okRecipient := txReceipt.Topics[2] == os.Getenv("nodeWallet")
+			amount := hex2int(txReceipt.Data)
+			if okWallet && okRecipient && amount == uint64(2) {
+				return true
+			}
+			log.Println("\n\n money: ", hex2int(txReceipt.Data))
 
-	return true
+		}
+	}
+
+	return false
+}
+
+func handleWalletAddress(b *telebot.Bot, m *telebot.Message) {
+	replyButtons := [][]telebot.ReplyButton{
+		{
+			telebot.ReplyButton{
+				Text: "100 MB",
+			},
+		},
+		{
+			telebot.ReplyButton{
+				Text: "500 MB",
+			},
+		},
+		{
+			telebot.ReplyButton{
+				Text: "1 GB",
+			},
+		},
+	}
+	ok := common.IsHexAddress(m.Text)
+	if ok {
+		_ , err := db.AddUserData(m.Sender.Username, "wallet" , m.Text)
+		if err != nil {
+			b.Send(m.Sender, "error while storing user eth address")
+			return
+		}
+		b.Send(m.Sender, "Attached the ETH wallet to user successfully")
+		b.Send(m.Sender, `Please select how much bandwidth you need by clicking on one of the buttons below: `, &telebot.ReplyMarkup{
+			ReplyKeyboard:       replyButtons,
+			ResizeReplyKeyboard: true,
+			OneTimeKeyboard: true,
+			ReplyKeyboardRemove: true,
+		})
+		return
+	}
+}
+
+func hex2int(hexStr string) uint64 {
+// remove 0x suffix if found in the input string
+cleaned := strings.Replace(hexStr, "0x", "", -1)
+
+// base 16 for hexadecimal
+result, _ := strconv.ParseUint(cleaned, 16, 64)
+return uint64(result)
 }

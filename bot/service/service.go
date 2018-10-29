@@ -20,32 +20,9 @@ var (
 
 func StartHandle(b *telebot.Bot, nodes []models.TONNode) (string, func(*telebot.Message)) {
 
-	replyButtons := [][]telebot.ReplyButton{
-		{
-			telebot.ReplyButton{
-				Text: "100 MB",
-			},
-		},
-		{
-			telebot.ReplyButton{
-				Text: "500 MB",
-			},
-		},
-		{
-			telebot.ReplyButton{
-				Text: "1 GB",
-			},
-		},
-	}
-
 	fnc := func(m *telebot.Message) {
 		b.Send(m.Sender, "Hey, "+m.Sender.Username+`. Welcome to the Sentinel Socks5 Bot for Telegram.
-Please select an option <number> in the format of <1> for 100 MB describing how Much Bandwidth Do you need?`, &telebot.ReplyMarkup{
-			ReplyKeyboard:       replyButtons,
-			ResizeReplyKeyboard: true,
-			OneTimeKeyboard: true,
-			ReplyKeyboardRemove: true,
-		})
+Please share your Ethereum wallet address that will be used for payments to this bot.`)
 		// b.Send(m.Sender, "1. 100 MB")
 		// b.Send(m.Sender, "2. 500 MB")
 		// b.Send(m.Sender, "3. 1 GB")
@@ -133,6 +110,8 @@ func TestHandle(b *telebot.Bot) {
 
 		log.Println("update: ", m.Text)
 		switch m.Text {
+		case checkWalletAddress(m):
+			handleWalletAddress(b, m)
 		case "100 MB", "500 MB", "1 GB":
 			handleBandwidth(b, m, nodes)
 		case nodeToInt(m):
@@ -148,10 +127,18 @@ func TestHandle(b *telebot.Bot) {
 			}
 			b.Send(m.Sender, "got your wallet")
 		default:
-			b.Send(m.Sender, `here are few options for you. \n1. Contact Sentinel Dev Team @SentinelNodeNetwork
-\n2. Take a deep breath and retry again by sending /start`)
+			b.Send(m.Sender, "here are few options for you."  +
+				"1. Contact Sentinel Dev Team @SentinelNodeNetwork" +
+				"2. Take a deep breath and retry again by sending /start")
 		}
 	})
+}
+
+func checkWalletAddress(m *telebot.Message) string {
+	if common.IsHexAddress(m.Text) {
+		return m.Text
+	}
+	return ""
 }
 
 func inlineButton(text, url string) [][]telebot.InlineButton {
@@ -164,3 +151,4 @@ func inlineButton(text, url string) [][]telebot.InlineButton {
 		},
 	}
 }
+

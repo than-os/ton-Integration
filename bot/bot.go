@@ -113,7 +113,6 @@ func main() {
 	//}
 
 	b.Handle(service.ListHandle(b, Nodes))
-
 	b.Handle(service.StartHandle(b, Nodes))
 
 	color.Green("%s", "started Telegram Bot API successfully")
