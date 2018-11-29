@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/fatih/color"
 	"github.com/labstack/echo"
 	"github.com/than-os/sent-dante/dbo"
 	"github.com/than-os/sent-dante/models"
@@ -151,21 +152,49 @@ func GetActiveConnections() {
 	c2.Wait()
 	io.Copy(os.Stdout, &b2)
 	fmt.Printf("here's final output: %s", os.Stdout)
+}
 
-	// cmd := exec.Command(queryParts[0], queryParts[1:]...)
-	//o, err := exec.Command(queryParts[0], queryParts[1:]...).Output()
-	// log.Printf("output: %s", o)
+func KeepAlive()  {
 
-	// if err := cmd.Run(); err == nil {
-	// 	o, _ := cmd.Output()
-	// 	fmt.Printf("output: \n%s", o)
-	// }
-	// cmd.Wait()
+	nodes , err := dao.FindAllTonNodes()
+	if err != nil {
+		log.Println("error while getting nodes: ", err)
+		return
+	}
+	for _, node := range nodes {
+		color.Red("IP Address: %s", node.IPAddr)
+		b, err := MakeGetRequest("https://"+ node.IPAddr + "/live")
+		if err != nil {
+			log.Println("error while getting node status: ", err)
+			return
+		}
 
+		if b.Message != "up" {
+			err := dao.RemoveTonNode(node.IPAddr)
+			if err != nil {
+				log.Println("error while removing node from db: ", err)
+				return
+			}
+		}
+
+	}
+	return
 }
 
 func checkError(err error) {
 	if err != nil {
 		log.Println(err)
 	}
+}
+
+func MakeGetRequest(url string) (models.KeepAliveResponse, error) {
+	var body models.KeepAliveResponse
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Println("error while checking node status: ", err)
+		return body, err
+	}
+	err = json.NewDecoder(resp.Body).Decode(&body)
+
+	return body, err
 }

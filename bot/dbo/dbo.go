@@ -1,9 +1,11 @@
 package dbo
 
 import (
-	"log"
-
+	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/util"
+	"github.com/than-os/sent-dante/models"
+	"log"
 )
 
 type SentinelBot struct {
@@ -32,7 +34,7 @@ func (b *SentinelBot) NewLevelDB() {
 
 func (b *SentinelBot) AddUserData(userName, key, value string) (string, error) {
 
-	k := []byte(userName+"-"+key)
+	k := []byte(key+"-"+userName)
 	v := []byte(value)
 	err := ldb.Put(k, v, nil)
 	// defer ldb.Close()
@@ -43,8 +45,50 @@ func (b *SentinelBot) AddUserData(userName, key, value string) (string, error) {
 	return "Updated Successfully", nil
 }
 
+func (b *SentinelBot) Iterate() []models.ExpiredUsers {
+	itr := ldb.NewIterator(util.BytesPrefix([]byte("timestamp")), nil)
+
+	var usersWithTimestamp []models.ExpiredUsers
+	for itr.Next() {
+		usersWithTimestamp = append(usersWithTimestamp, models.ExpiredUsers{
+			Key: fmt.Sprintf("%s", itr.Key()), Value: fmt.Sprintf("%s", itr.Value()),
+		})
+	}
+	itr.Release()
+	err := itr.Error()
+	if err != nil {
+		return usersWithTimestamp
+	}
+
+	return usersWithTimestamp
+}
 func (b *SentinelBot) CheckUserOptions(userName, key string) ([]byte, error) {
 
-	resp, err := ldb.Get([]byte(userName+"-"+key), nil)
+	resp, err := ldb.Get([]byte(key+"-"+userName), nil)
 	return resp, err
+}
+
+//func FindAll() {
+//	itr := ldb.NewIterator(nil, nil)
+//
+//	for itr.Next() {
+//		log.Printf("alluser Key %s\n", itr.Key())
+//		log.Printf("alluser value %s\n", itr.Value())
+//	}
+//
+//	itr.Release()
+//	err := itr.Error()
+//
+//	log.Println("erorr in all user", err)
+//
+//}
+
+func (b *SentinelBot) RemoveUser(username string) error {
+	err := ldb.Delete([]byte("timestamp--"+username), nil)
+	err = ldb.Delete([]byte("auth-"+username), nil)
+	err = ldb.Delete([]byte("node-"+username), nil)
+	err = ldb.Delete([]byte("password-"+username), nil)
+	err  = ldb.Delete([]byte("bw-"+username), nil)
+	err  = ldb.Delete([]byte("uri-"+username), nil)
+	return err
 }

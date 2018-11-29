@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/fatih/color"
+	"github.com/jasonlvhit/gocron"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	. "github.com/than-os/sent-dante/dbo"
@@ -11,6 +13,13 @@ var d = TON{}
 
 func main() {
 
+
+	s := gocron.NewScheduler()
+	go func() {
+		s.Every(5).Seconds().Do(service.KeepAlive)
+		color.Red("%s", "running the job")
+		<-s.Start()
+	}()
 	e := echo.New()
 
 	//middlewares
